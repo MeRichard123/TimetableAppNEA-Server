@@ -107,7 +107,7 @@ class TimeslotRoutes(viewsets.ViewSet,SharedMethods):
             unit = request.query_params.get('unit')
             day = request.query_params.get('day')
             unitName = f'Unit{unit}'
-            queryset = Timeslot.objects.filter(ClassGroup__classCode=pk, Day=day, Unit=unitName).first()
+            queryset = Timeslot.objects.get(ClassGroup__classCode=pk, Day=day, Unit=unitName)
             serializer = TimeslotSerializer(queryset)
             data = self.ExtractValuesById(serializer.data)
             return Response(data)
@@ -198,18 +198,14 @@ class SubjectRoutes(viewsets.ViewSet):
         """
         subjectsMissingWeights = dict()
         for subject in currentAmounts.keys():
-            queryset = Subject.objects.filter(yearGroup__name = f'Yr{yearGroup}',name=subject).first()
+            queryset = Subject.objects.get(yearGroup__name = f'Yr{yearGroup}',name=subject)
             subjectData = SubjectSerializer(queryset).data
             amountMissing =subjectData['Count'] - currentAmounts[subject]
             if amountMissing != 0:
-                subjectsMissingWeights[subject] = amountMissing
+                subjectsMissingWeights[queryset.id] = amountMissing
         
-        # Convert subject names to a list of Ids
-        subjectMissingIds = []
-        for subject in subjectsMissingWeights:
-            # get the ID
-            id_ = Subject.objects.filter(yearGroup__name = f'Yr{yearGroup}',name=subject).first().id 
-            subjectMissingIds.append(id_)
+        # Sort by how much they are missing so the one they are missing most is on top.
+        subjectMissingIds = sorted(subjectsMissingWeights,key=lambda k: subjectsMissingWeights[k],reverse=True)
         return subjectMissingIds
 
     def list(self , request:HttpRequest) -> 'QuerySet[Subject]':
@@ -264,11 +260,12 @@ class SubjectRoutes(viewsets.ViewSet):
         # the subjects the yeargroup is missing most of in their timetable
         subjectMissingIds = self.__getMissingSubjectAmounts(currentAmounts, pk)
 
+        preserveOrder = Case(*[When(pk=pk, then=pos) for pos,pk in enumerate(subjectMissingIds)])
 
         subjectFrequencyQueryset = Subject.objects.filter(
             yearGroup__name = f'Yr{pk}',
-            id__in=subjectMissingIds).order_by('-Count')
-            
+            id__in=subjectMissingIds).order_by(preserveOrder)
+        
         serializedSubjects = SubjectSerializer(subjectFrequencyQueryset, many=True)
         return Response(serializedSubjects.data)
 
@@ -384,7 +381,7 @@ class TeacherRoutes(viewsets.ViewSet):
 
         # Find the difference between the two sets to get all the free teachers
         freeTeachers = allTeacherIds - occupiedTeacherIds
-
+        
         # Hash table of teacher hours missing
         teacherHours = dict()
         # calculate missing hours
@@ -398,7 +395,7 @@ class TeacherRoutes(viewsets.ViewSet):
         teachersWithFreeHours = list(filter(lambda id_: teacherHours[id_] != 0, teacherHours))
         # Order by from most missing hours to least
         teachersWithFreeHours.sort(reverse=True)
-
+        
       
         #NOTE: pk and index of the sorted teachersWithFreeHours 
         '''
@@ -416,9 +413,8 @@ class TeacherRoutes(viewsets.ViewSet):
 
         freeTeachersQuery = Teacher.objects.filter(
                         id__in=teachersWithFreeHours,
-                        SubjectTeach__name__in=[subject]
+                         SubjectTeach__name__in=[subject]
                         ).distinct().order_by(preserveOrder)
-                        
         freeTeachersData = TeacherSerializer(freeTeachersQuery, many=True)
         return Response(freeTeachersData.data)
     
@@ -453,7 +449,7 @@ class RoomRoutes(viewsets.ViewSet):
 
     def list(self, request:HttpRequest) -> 'QuerySet[Room]':
         """Filtered Endpoint for returning rooms
-        /api/rooms/free/?class=class&Subject=subject&day=day&unit=unit&teacher=teacher
+        /api/rooms/?class=class&Subject=subject&day=day&unit=unit&teacher=teacher 
         Query Params:
             - class (str) :
             - subject (str) :
@@ -509,7 +505,8 @@ class RoomRoutes(viewsets.ViewSet):
         prioritizeRooms = list(filter(lambda roomId: roomId in teacherRoomIds, freeRooms))
 
         outPutFilteredRooms = None
-        # check of their are any rooms of teachers free and return them of yes
+        # check of there are any rooms of teachers free and return them of yes
+        # AP is excluded as there are no specific rooms for that.
         if len(prioritizeRooms) >= 1 and subject != "AP":
             outPutFilteredRooms = prioritizeRooms
         else:

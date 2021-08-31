@@ -6,7 +6,7 @@ class Timeslot(models.Model):
         ('Mon','Monday'),
         ('Tue','Tuesday'),
         ('Wed','Wednesday'),
-        ('Thr','Thursday'),
+        ('Thu','Thursday'),
         ('Fri','Friday')
     ]
     UnitChoices = [

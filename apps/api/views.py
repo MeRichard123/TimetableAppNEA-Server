@@ -245,26 +245,55 @@ class SubjectRoutes(viewsets.ViewSet):
 
         # Check for group and return the grouped if any
         blockedSubject = self.__CheckBlockedSubjects(day,f'Unit{unit}',class_)
-        if blockedSubject != None:
+        if blockedSubject != None: # if there is a blocked subject
             queryset = Subject.objects.get(yearGroup__name = f'Yr{pk}',name=blockedSubject)
             serializer = SubjectSerializer(queryset)
             return Response(serializer.data)
+
+        '''
+        if there is no blocked subject
+            if any class has a non-blocked subject then
+                remove blocked subjects
+        '''
         
         # get all the subjects for a year group
         queryset = Subject.objects.filter(yearGroup__name = f'Yr{pk}')
         serializer = SubjectSerializer(queryset, many=True)
         allSubjects = serializer.data
+        removeBlocked = False
 
+        # Remove blocked subjects if a class already has a non blocked subject
+        if blockedSubject == None:
+            yearHalf = class_[:2]
+            yearSubjects = Timeslot.objects.filter(Day=day,Unit=f'Unit{unit}', ClassGroup__classCode__contains=yearHalf)
+            classSubjectData = TimeslotSerializer(yearSubjects,many=True).data
+            blockedSubjects = ['Maths','English','PE','PSHE']
+            subjectNames = [Subject.objects.get(id=item['Subject']).name for item in classSubjectData]
+
+            if any(not subject in blockedSubjects for subject in subjectNames):
+                removeBlocked = True
+                
+        
         # find current amount of each subject a yeargroup has on their timetable
         currentAmounts = self.__getCurrentSubjectTotals(class_, allSubjects)
         # the subjects the yeargroup is missing most of in their timetable
         subjectMissingIds = self.__getMissingSubjectAmounts(currentAmounts, pk)
 
+        
+
         preserveOrder = Case(*[When(pk=pk, then=pos) for pos,pk in enumerate(subjectMissingIds)])
 
-        subjectFrequencyQueryset = Subject.objects.filter(
-            yearGroup__name = f'Yr{pk}',
-            id__in=subjectMissingIds).order_by(preserveOrder)
+        if removeBlocked:
+            subjectFrequencyQueryset = Subject.objects.filter(
+                yearGroup__name = f'Yr{pk}',
+                id__in=subjectMissingIds,
+            ).exclude(
+                name__in=['Maths','PSHE','PE','English']
+            ).order_by(preserveOrder)
+        else:
+            subjectFrequencyQueryset = Subject.objects.filter(
+                yearGroup__name = f'Yr{pk}',
+                id__in=subjectMissingIds).order_by(preserveOrder)
         
         serializedSubjects = SubjectSerializer(subjectFrequencyQueryset, many=True)
         return Response(serializedSubjects.data)
@@ -516,17 +545,23 @@ class RoomRoutes(viewsets.ViewSet):
         # Allow to return both computing and ICT rooms because they are
         # Differentiated. This is because some rooms are for IT and Computer Science
         # Others are just there available for booking 
-        if subject == "ICT":
+        if subject == "ICT" or subject == "Computing":
             # Q gives me the ability to perform or operations: Computing OR ICT Room
             query = Q(Description='ICT') | Q(Description='Computing')
             queryset = Room.objects.filter(query, id__in=outPutFilteredRooms)
         else:
             queryset = Room.objects.filter(Description=subject, id__in=outPutFilteredRooms)
-        
+            # Append the rest of the rooms on the list
+            currentFilteredData = set(self.__convertRoomsToIds(queryset))
+            allRoomsUnique = set(freeRooms) - currentFilteredData
+            querysetIds =  list(currentFilteredData) + list(allRoomsUnique)
+            preserveOrder = Case(*[When(pk=pk, then=pos) for pos,pk in enumerate(querysetIds)])
+            queryset = Room.objects.filter(id__in=querysetIds).order_by(preserveOrder)
+  
         # Return all if no filtered rooms are found
         if len(queryset) == 0:
             queryset = Room.objects.filter(id__in=outPutFilteredRooms)
-  
+        
         serializer = RoomSerializer(queryset, many=True)
         return Response(serializer.data)
 

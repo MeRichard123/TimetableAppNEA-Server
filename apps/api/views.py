@@ -4,12 +4,11 @@ from rest_framework.permissions import IsAuthenticated
 from django.db.models.query import QuerySet
 from django.http import  HttpRequest
 from django.db.models import Q, Case, When
+from django.shortcuts import get_object_or_404
 
 from .serializers import *
 from .models import Teacher, Timeslot, YearGroup, Room, Subject, ClassGroup
         
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
 
 
 class SharedMethods:
@@ -102,12 +101,11 @@ class TimeslotRoutes(viewsets.ViewSet,SharedMethods):
         Returns:
             Response: return the filter values
         '''
-        
         if request.query_params:
             unit = request.query_params.get('unit')
             day = request.query_params.get('day')
             unitName = f'Unit{unit}'
-            queryset = Timeslot.objects.get(ClassGroup__classCode=pk, Day=day, Unit=unitName)
+            queryset = get_object_or_404(Timeslot, ClassGroup__classCode=pk, Day=day, Unit=unitName)
             serializer = TimeslotSerializer(queryset)
             data = self.ExtractValuesById(serializer.data)
             return Response(data)
@@ -117,6 +115,9 @@ class TimeslotRoutes(viewsets.ViewSet,SharedMethods):
                             },status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, req, pk):
+        if not req.user.is_staff:
+            return Response({'msg':'UNAUTHORISED'})
+
         timeslot = Timeslot.objects.get(id=pk)
         timeslot.delete()
         return Response(data={"Deleted Timeslot"}, status=status.HTTP_204_NO_CONTENT)
@@ -219,11 +220,7 @@ class SubjectRoutes(viewsets.ViewSet):
         data = SubjectSerializer(qs, many=True).data
         return Response(set([subject['name'] for subject in data]))
     
-    dayParamsConfig = openapi.Parameter('day',in_=openapi.IN_QUERY,type=openapi.TYPE_STRING)
-    unitParamsConfig = openapi.Parameter('unit',in_=openapi.IN_QUERY,type=openapi.TYPE_INTEGER)
-    classParamsConfig = openapi.Parameter('class',in_=openapi.IN_QUERY,type=openapi.TYPE_STRING)
 
-    @swagger_auto_schema(manual_parameters=[dayParamsConfig,unitParamsConfig, classParamsConfig])
     def retrieve(self, request:HttpRequest, pk:int) -> 'QuerySet[Subject]':
         '''
         GET /api/subjects/7/?day=Mon&unit=5&class=7B2
@@ -326,10 +323,6 @@ class ClassRoutes(viewsets.ViewSet,SharedMethods):
         return Response([ClassObject.name for ClassObject in queryset])
 
 
-    dayParamsConfig = openapi.Parameter('day',in_=openapi.IN_QUERY,type=openapi.TYPE_STRING)
-    unitParamsConfig = openapi.Parameter('unit',in_=openapi.IN_QUERY,type=openapi.TYPE_INTEGER)
-
-    @swagger_auto_schema(manual_parameters=[dayParamsConfig,unitParamsConfig])
     def retrieve(self, request:HttpRequest, pk:int) -> 'QuerySet[YearGroup]':
         '''Perform:
         SELECT * FROM YearGroup WHERE name = Yr{pk}

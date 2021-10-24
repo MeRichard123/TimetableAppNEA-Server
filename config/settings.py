@@ -29,7 +29,6 @@ INSTALLED_APPS = [
     'apps.api',
     'apps.users',
     'rest_framework',
-    'drf_yasg',
     'knox',
     'corsheaders',
 ]

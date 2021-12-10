@@ -175,13 +175,13 @@ class SubjectRoutes(viewsets.ViewSet):
 
         Returns:
             [dict]: a dictionary holding the subject and amount the class has
-        """
+       """
         currentAmounts = dict()
         for subject in allSubjects:
             subjectName = subject['name']
             amountHave = Timeslot.objects.filter(
                  ClassGroup__classCode=class_,
-                 Subject__name = subjectName ).count()
+                 Subject__name = subjectName).count()
             currentAmounts[subjectName] = amountHave
         return currentAmounts
 
@@ -206,7 +206,10 @@ class SubjectRoutes(viewsets.ViewSet):
                 subjectsMissingWeights[queryset.id] = amountMissing
         
         # Sort by how much they are missing so the one they are missing most is on top.
-        subjectMissingIds = sorted(subjectsMissingWeights,key=lambda k: subjectsMissingWeights[k],reverse=True)
+        subjectMissingIds = sorted(subjectsMissingWeights,
+                                    key=lambda k: subjectsMissingWeights[k],
+                                    reverse=True
+                                    )
         return subjectMissingIds
 
     def list(self , request:HttpRequest) -> 'QuerySet[Subject]':
@@ -235,7 +238,6 @@ class SubjectRoutes(viewsets.ViewSet):
         unit = request.query_params.get('unit')
         class_ = request.query_params.get('class')
 
-
         if any(param == None for param in [day,unit,class_]):
             return Response({'msg':'Missing Query for Unit, Day and Class',
                              'format':'/api/subjects/7/?day=Mon&unit=5&class=7B2'})
@@ -246,13 +248,7 @@ class SubjectRoutes(viewsets.ViewSet):
             queryset = Subject.objects.get(yearGroup__name = f'Yr{pk}',name=blockedSubject)
             serializer = SubjectSerializer(queryset)
             return Response(serializer.data)
-
-        '''
-        if there is no blocked subject
-            if any class has a non-blocked subject then
-                remove blocked subjects
-        '''
-        
+       
         # get all the subjects for a year group
         queryset = Subject.objects.filter(yearGroup__name = f'Yr{pk}')
         serializer = SubjectSerializer(queryset, many=True)
@@ -270,13 +266,10 @@ class SubjectRoutes(viewsets.ViewSet):
             if any(not subject in blockedSubjects for subject in subjectNames):
                 removeBlocked = True
                 
-        
         # find current amount of each subject a yeargroup has on their timetable
         currentAmounts = self.__getCurrentSubjectTotals(class_, allSubjects)
         # the subjects the yeargroup is missing most of in their timetable
         subjectMissingIds = self.__getMissingSubjectAmounts(currentAmounts, pk)
-
-        
 
         preserveOrder = Case(*[When(pk=pk, then=pos) for pos,pk in enumerate(subjectMissingIds)])
 

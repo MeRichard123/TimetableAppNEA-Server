@@ -447,20 +447,22 @@ class TeacherRoutes(viewsets.ViewSet):
 
 class RoomRoutes(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
-    
-    @staticmethod
-    def __convertRoomsToIds(queryset):
+   
+    def __convertRoomsToIds(self,query):
         """Convert a set of rooms returned from db
         to a list of ids for easier comparison.
 
         Args:
-            queryset (QuerySet): result from db query
+            query (QuerySet): result from db query
 
         Returns:
-            [set]: ids of entities in the queryset
+            list: ids of entities in the queryset
         """
-        allRooms = RoomSerializer(queryset, many=True).data
-        return set([room['id'] for room in allRooms])
+        if len(query) == 0:
+            return []
+        else:
+            return [query[0].id] + self.__convertRoomsToIds(query[1:])
+
 
     def list(self, request:HttpRequest) -> 'QuerySet[Room]':
         """Filtered Endpoint for returning rooms
@@ -498,7 +500,7 @@ class RoomRoutes(viewsets.ViewSet):
         
         # Get ids of all rooms making sure there is enough space in the room
         allRooms = Room.objects.filter(Capacity__gte=PupilsInClass)
-        allRoomIds = self.__convertRoomsToIds(allRooms)
+        allRoomIds = set(self.__convertRoomsToIds(allRooms))
  
         # Set Difference for all free rooms - remove used rooms from all rooms set
         freeRooms = allRoomIds - usedRoomIds
@@ -514,7 +516,7 @@ class RoomRoutes(viewsets.ViewSet):
         # get all the ids of rooms of the teacher from query so that we can
         # prioritize the room of the teacher if it's free
         RoomDataOfTeacher = Room.objects.filter(RoomNumber__in=teacherRooms)
-        teacherRoomIds = self.__convertRoomsToIds(RoomDataOfTeacher)
+        teacherRoomIds = set(self.__convertRoomsToIds(RoomDataOfTeacher))
         
         # Filter rooms and only return the teacher rooms which are free
         prioritizeRooms = list(filter(lambda roomId: roomId in teacherRoomIds, freeRooms))
@@ -536,11 +538,18 @@ class RoomRoutes(viewsets.ViewSet):
             query = Q(Description='ICT') | Q(Description='Computing')
             queryset = Room.objects.filter(query, id__in=outPutFilteredRooms)
         else:
+            # get all free rooms which have that subject in them
             queryset = Room.objects.filter(Description=subject, id__in=outPutFilteredRooms)
-            # Append the rest of the rooms on the list
+            # if we prioritize the teacher rooms, then we need to return the other rooms as well
+            # so the user has an option, but we don't want to return the teacher rooms twice therefore
+            # we use a set difference to remove the teacher rooms from the queryset
+            # convert the queryset to a set of unique ids
             currentFilteredData = set(self.__convertRoomsToIds(queryset))
+            # remove the prioritized room from the free rooms.
             allRoomsUnique = set(freeRooms) - currentFilteredData
+            # Append the rest of the rooms on the list to make the prioritized rooms be on top
             querysetIds =  list(currentFilteredData) + list(allRoomsUnique)
+            
             preserveOrder = Case(*[When(pk=pk, then=pos) for pos,pk in enumerate(querysetIds)])
             queryset = Room.objects.filter(id__in=querysetIds).order_by(preserveOrder)
   

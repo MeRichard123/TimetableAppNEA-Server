@@ -8,7 +8,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 env = environ.Env()
 environ.Env.read_env()
 
-SECRET_KEY = 'e8ybs!rf0@w%m$q68$r8+fy8@le@$@=c(x&$mg0ujpn*ch=u2+'
+SECRET_KEY = env("KEY") 
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -76,7 +76,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': 'timetableapplocal',
         'USER': 'postgres',
-        'PASSWORD': 'fullstackSQL123',
+        'PASSWORD': env("PASSWORD"),
         'HOST': 'localhost',
         'PORT': '',
     }

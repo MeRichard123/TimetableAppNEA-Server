@@ -8,7 +8,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 env = environ.Env()
 environ.Env.read_env()
 
-#! WARNING: If you're gonna push this add an env file 
 SECRET_KEY = env("KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -75,7 +74,6 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        # If you're gonna push this add env
         'NAME': 'timetableapplocal',
         'USER': 'postgres',
         'PASSWORD': env("PASSWORD"),
@@ -101,6 +99,7 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
 
 
 # Internationalization

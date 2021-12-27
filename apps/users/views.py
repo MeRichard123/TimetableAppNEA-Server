@@ -1,9 +1,10 @@
 from rest_framework import generics, permissions
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view
 from knox.models import AuthToken
-from .serializers import UserSerializer, LoginSerializer
-
+from .serializers import UserSerializer, LoginSerializer, ExtendedUserSerializer
+from  .models import ExtendUser
+from rest_framework import viewsets
 
 class LoginApi(generics.GenericAPIView):
     serializer_class = LoginSerializer
@@ -17,11 +18,21 @@ class LoginApi(generics.GenericAPIView):
             'token': AuthToken.objects.create(user)[1],
         })
 
-class GetUserApi(generics.RetrieveAPIView):
+class GetUserApi(viewsets.ViewSet):
     permission_classes = [
-        permissions.IsAuthenticated
+        permissions.IsAuthenticated,
     ]
-    serializer_class = UserSerializer
+
+    def list(self, request):
+        user = ExtendUser.objects.get(user=request.user)
+        serializedExtended = ExtendedUserSerializer(user)
+        mainUser = UserSerializer(request.user)
+        return Response({'user':mainUser.data ,'extended':serializedExtended.data})
+
+@api_view()
+def completeTutorial(request):
+    user = ExtendUser.objects.get(user=request.user)
+    user.finishedTutorial = True
+    user.save()
     
-    def get_object(self):
-        return self.request.user
+    return Response({'finishedTutorial': True})

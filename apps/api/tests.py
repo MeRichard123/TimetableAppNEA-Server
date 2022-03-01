@@ -1,11 +1,22 @@
-from django.http import request
-from django.test import TestCase
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
 from rest_framework.test import APIRequestFactory
+from rest_framework.test import force_authenticate
+from django.contrib.auth.models import User
+from .views import ClassRoutes
 
-# Create your tests here.
+user = User.objects.get(username="admin")
 
-factory = APIRequestFactory()
+class APITest(APITestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
 
-request = factory.get("/api/year", None)
-
-# WRITE TESTS FOR ROOMS
+    def test_fetch_classes(self):
+        """
+        Ensure we can fetch classes
+        """
+        request = self.factory.get('/classes/')
+        force_authenticate(request, user=user)
+        response = ClassRoutes.as_view({'get':'list'})(request)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

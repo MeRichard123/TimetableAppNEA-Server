@@ -10,7 +10,6 @@ class TimeslotSerializer(serializers.ModelSerializer):
 class TeacherSerializer(serializers.ModelSerializer):
     # Slugs replace the id you would get normally 
     Room = serializers.SlugRelatedField(read_only=True, many=True, slug_field="RoomNumber")
-    # SubjectTeach = serializers.SlugRelatedField(read_only=True, many=True, slug_field="name")
     class Meta:
         model = Teacher
         fields = ('id','name','Room')

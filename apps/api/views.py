@@ -579,12 +579,13 @@ class OverviewRoute(viewsets.ViewSet):
         unit = request.query_params.get('unit')
         # Optional
         subject = request.query_params.get('subject')
-
+        # enforce that the day and unit are passed in allowing for subject to be optional
         if any(param == None for param in [day,unit]):
             return Response({'msg':"A Parameter is missing. Required:",
                             'params':['day','unit']},
                             status=status.HTTP_400_BAD_REQUEST)
 
+        # similar DB queries as for the filtering however this time we return it all in one route.
         currentLessons = Timeslot.objects.filter(Day=day, Unit=f'Unit{unit}')
         currentLessonsData = TimeslotSerializer(currentLessons,many=True).data
         usedRoomIds = set([timeslot['Room'] for timeslot in currentLessonsData])

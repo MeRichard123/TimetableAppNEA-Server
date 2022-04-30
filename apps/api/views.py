@@ -335,11 +335,28 @@ class ClassRoutes(viewsets.ViewSet,SharedMethods):
             classTimeslots = Timeslot.objects.filter(ClassGroup__classCode__contains = pk)
             serializedTimeslots = TimeslotSerializer(classTimeslots,many=True)
 
+            lessonsRemaining = {}
+
+            allSubjects = Subject.objects.filter(yearGroup__name = f'Yr{pk}')
+            
+            for class_ in yearGroupData['classes']:
+                lessonRemainData = {}
+                for subject in allSubjects:
+                    lessonsNeed = subject.Count
+                    lessonsHave = Timeslot.objects.filter(ClassGroup__classCode = class_, Subject__name = subject.name).count()
+                    lessonsLeft = lessonsNeed - lessonsHave
+                    lessonRemainData[subject.name] = lessonsLeft
+                
+                lessonsRemaining[class_] = lessonRemainData
+
+
             returnObject = {
                 'name': yearGroupData['name'],
                 'classes': yearGroupData['classes'],
-                'timeslots': [self.ExtractValuesById(data) for data in serializedTimeslots.data]
+                'timeslots': [self.ExtractValuesById(data) for data in serializedTimeslots.data],
+                'lessonsRemaining': lessonsRemaining
             }
+            # print(returnObject)
         except:
             return Response('No Classes Found', status=status.HTTP_204_NO_CONTENT)
         return Response(returnObject)
@@ -600,6 +617,7 @@ class OverviewRoute(viewsets.ViewSet):
         queryset = Room.objects.filter(query, id__in=freeRooms)
         
         teacherOutput = {}
+        teacherHours = {}
 
         if subject:
             currentOccupiedTeachers = Timeslot.objects.filter(Day=day, Unit=f'Unit{unit}')
@@ -611,13 +629,38 @@ class OverviewRoute(viewsets.ViewSet):
             allTeacherIds = set([teacher['id'] for teacher in allTeacherData])
 
             freeTeachers = allTeacherIds - occupiedTeacherIds
-            teacherQuery = Teacher.objects.filter(id__in=freeTeachers, SubjectTeach__name__in=[subject]).distinct()
+                           
+            teacherFreeHours = dict()
+            # calculate missing hours
+            for teacherId in freeTeachers:
+                teacherCurrentHours = Timeslot.objects.filter(Teacher=teacherId).count()
+                teacher = Teacher.objects.get(id=teacherId)
+                weeklyLessons = teacher.LessonsWeekly
+                remainingHours = weeklyLessons - teacherCurrentHours
+                teacherFreeHours[teacherId] = remainingHours
+            # Filter out teachers who have no free hours
+            teachersWithFreeHours = list(filter(lambda id_: teacherFreeHours[id_] != 0, teacherFreeHours))
+            # Order by from most missing hours to least
+            
+            teacherQuery = Teacher.objects.filter(id__in=teachersWithFreeHours, SubjectTeach__name__in=[subject]).distinct()
             teacherOutput = TeacherSerializer(teacherQuery, many=True).data
+
+        
+            # Hash table of teacher hours missing
+            teacherHours = dict()
+            # calculate missing hours
+            for teacherId in teachersWithFreeHours:
+                teacherCurrentHours = Timeslot.objects.filter(Teacher=teacherId).count()
+                teacher = Teacher.objects.get(id=teacherId)
+                weeklyLessons = teacher.LessonsWeekly
+                remainingHours = weeklyLessons - teacherCurrentHours
+                teacherHours[teacher.name] = remainingHours
 
 
         roomsOutput = RoomSerializer(queryset, many=True).data
         response = {
             'rooms': roomsOutput,
-            'teachers': teacherOutput
+            'teachers': teacherOutput,
+            'teacherHours': teacherHours
         }
         return Response(response)

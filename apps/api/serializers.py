@@ -7,6 +7,7 @@ class TimeslotSerializer(serializers.ModelSerializer):
         model = Timeslot
         fields = '__all__'
 
+
 class TeacherSerializer(serializers.ModelSerializer):
     # Slugs replace the id you would get normally 
     Room = serializers.SlugRelatedField(read_only=True, many=True, slug_field="RoomNumber")

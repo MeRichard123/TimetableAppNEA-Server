@@ -39,7 +39,26 @@ class SharedMethods:
                 'Subject': SubjectVal,
                 'ClassGroup': ClassGroupVal
             }
-        return data  
+        return data
+
+    @staticmethod
+    def convertQuerySetToIds(query):
+        """Convert a set of entities returned from db
+        to a list of ids for easier comparison.
+
+        Args:
+            query (QuerySet): result from db query
+
+        Returns:
+            list: ids of entities in the queryset
+        """
+        if len(query) == 0:
+            return []
+        else:
+            return [query[0].id] + SharedMethods.convertQuerySetToIds(query[1:])
+
+
+  
 
 
 # ============= Timeslot route logic =============
@@ -374,7 +393,7 @@ class ClassRoutes(viewsets.ViewSet,SharedMethods):
 # GET /api/teachers/?Unit=1&Day=Mon&subject=subject/
 
 
-class TeacherRoutes(viewsets.ViewSet):
+class TeacherRoutes(viewsets.ViewSet, SharedMethods):
     permission_classes = [IsAuthenticated]
 
     def list(self , request:HttpRequest) -> 'QuerySet[Teacher]':
@@ -447,8 +466,20 @@ class TeacherRoutes(viewsets.ViewSet):
                         id__in=teachersWithFreeHours,
                          SubjectTeach__subjects__name__in=[subject]
                         ).distinct().order_by(preserveOrder)
-        freeTeachersData = TeacherSerializer(freeTeachersQuery, many=True)
-        return Response(freeTeachersData.data)
+        freeTeachersData = TeacherSerializer(freeTeachersQuery, many=True).data
+
+        freeTeachersSet = set(self.convertQuerySetToIds(freeTeachersQuery))
+        restTeachersIds = set(teachersWithFreeHours) - freeTeachersSet
+
+        restTeachersQuery = Teacher.objects.filter(id__in=restTeachersIds)
+        restTeachersData = TeacherSerializer(restTeachersQuery, many=True).data
+
+        response = {
+            'teachers': freeTeachersData,
+            'allTeachers': restTeachersData,
+        }
+
+        return Response(response)
     
 
 
@@ -462,25 +493,9 @@ class TeacherRoutes(viewsets.ViewSet):
 
 
 
-class RoomRoutes(viewsets.ViewSet):
+class RoomRoutes(viewsets.ViewSet, SharedMethods):
     permission_classes = [IsAuthenticated]
-   
-    def __convertRoomsToIds(self,query):
-        """Convert a set of rooms returned from db
-        to a list of ids for easier comparison.
-
-        Args:
-            query (QuerySet): result from db query
-
-        Returns:
-            list: ids of entities in the queryset
-        """
-        if len(query) == 0:
-            return []
-        else:
-            return [query[0].id] + self.__convertRoomsToIds(query[1:])
-
-
+  
     def list(self, request:HttpRequest) -> 'QuerySet[Room]':
         """Filtered Endpoint for returning rooms
         /api/rooms/?class=class&Subject=subject&day=day&unit=unit&teacher=teacher 
@@ -517,7 +532,7 @@ class RoomRoutes(viewsets.ViewSet):
         
         # Get ids of all rooms making sure there is enough space in the room
         allRooms = Room.objects.filter(Capacity__gte=PupilsInClass)
-        allRoomIds = set(self.__convertRoomsToIds(allRooms))
+        allRoomIds = set(self.convertQuerySetToIds(allRooms))
  
         # Set Difference for all free rooms - remove used rooms from all rooms set
         freeRooms = allRoomIds - usedRoomIds
@@ -533,7 +548,7 @@ class RoomRoutes(viewsets.ViewSet):
         # get all the ids of rooms of the teacher from query so that we can
         # prioritize the room of the teacher if it's free
         RoomDataOfTeacher = Room.objects.filter(RoomNumber__in=teacherRooms)
-        teacherRoomIds = set(self.__convertRoomsToIds(RoomDataOfTeacher))
+        teacherRoomIds = set(self.convertQuerySetToIds(RoomDataOfTeacher))
         
         # Filter rooms and only return the teacher rooms which are free
         prioritizeRooms = list(filter(lambda roomId: roomId in teacherRoomIds, freeRooms))
@@ -561,7 +576,7 @@ class RoomRoutes(viewsets.ViewSet):
             # so the user has an option, but we don't want to return the teacher rooms twice therefore
             # we use a set difference to remove the teacher rooms from the queryset
             # convert the queryset to a set of unique ids
-            currentFilteredData = set(self.__convertRoomsToIds(queryset))
+            currentFilteredData = set(self.convertQuerySetToIds(queryset))
             # remove the prioritized room from the free rooms.
             allRoomsUnique = set(freeRooms) - currentFilteredData
             # Append the rest of the rooms on the list to make the prioritized rooms be on top

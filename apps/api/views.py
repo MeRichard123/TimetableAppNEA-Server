@@ -7,7 +7,7 @@ from django.db.models import Q, Case, When
 from django.shortcuts import get_object_or_404
 
 from .serializers import *
-from .models import Teacher, Timeslot, YearGroup, Room, Subject, ClassGroup, SubjectGroup
+from .models import Teacher, Timeslot, YearGroup, Room, Subject, ClassGroup
         
 
 

@@ -7,7 +7,7 @@ from django.db.models import Q, Case, When
 from django.shortcuts import get_object_or_404
 
 from .serializers import *
-from .models import Teacher, Timeslot, YearGroup, Room, Subject, ClassGroup
+from .models import Teacher, Timeslot, YearGroup, Room, Subject, ClassGroup, SubjectGroup
         
 
 
@@ -445,7 +445,7 @@ class TeacherRoutes(viewsets.ViewSet):
 
         freeTeachersQuery = Teacher.objects.filter(
                         id__in=teachersWithFreeHours,
-                         SubjectTeach__name__in=[subject]
+                         SubjectTeach__subjects__name__in=[subject]
                         ).distinct().order_by(preserveOrder)
         freeTeachersData = TeacherSerializer(freeTeachersQuery, many=True)
         return Response(freeTeachersData.data)
@@ -642,7 +642,7 @@ class OverviewRoute(viewsets.ViewSet):
             teachersWithFreeHours = list(filter(lambda id_: teacherFreeHours[id_] != 0, teacherFreeHours))
             # Order by from most missing hours to least
             
-            teacherQuery = Teacher.objects.filter(id__in=teachersWithFreeHours, SubjectTeach__name__in=[subject]).distinct()
+            teacherQuery = Teacher.objects.filter(id__in=teachersWithFreeHours, SubjectTeach__subjects__name__in=[subject]).distinct()
             teacherOutput = TeacherSerializer(teacherQuery, many=True).data
 
         

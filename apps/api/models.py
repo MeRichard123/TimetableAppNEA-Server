@@ -29,7 +29,7 @@ class Teacher(models.Model):
     name = models.CharField(max_length=50,default="Mrs Jones")
     LessonsWeekly = models.IntegerField(default=0)
     Room = models.ManyToManyField("Room", blank=True)
-    SubjectTeach = models.ManyToManyField("Subject", blank=True)
+    SubjectTeach = models.ManyToManyField("SubjectGroup", blank=True)
 
     def __str__(self):
         return self.name
@@ -102,6 +102,9 @@ class Subject(models.Model):
     def __str__(self):
         return f'{self.name} - {self.yearGroup}' 
 
+class SubjectGroup(models.Model):
+    name = models.CharField(max_length=50)
+    subjects = models.ManyToManyField('Subject',blank=True)
 
-
-
+    def __str__(self):
+        return f'{self.name}'

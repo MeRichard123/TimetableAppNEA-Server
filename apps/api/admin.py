@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Timeslot,YearGroup,Teacher,Subject,Room,ClassGroup,Block
+from .models import Timeslot,YearGroup,Teacher,Subject,Room,ClassGroup,Block, SubjectGroup
 from django.db.models import Count
 from .customFilters import PupilCountFilter,RoomCapacityFilter
 
@@ -11,6 +11,7 @@ from .customFilters import PupilCountFilter,RoomCapacityFilter
 
 """
 admin.site.register(Block)
+admin.site.register(SubjectGroup)
 
 @admin.register(Timeslot)
 class TimeSlotAdmin(admin.ModelAdmin):
